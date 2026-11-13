@@ -9,10 +9,10 @@ window.PELMENCHYK_CONFIG = {
   orderEndpoint: "",
 
   // Supabase: база замовлень, меню, адмінка. Дані беруться в Supabase → Project Settings → API.
-  // supabaseAnonKey — публічний ключ (anon / publishable), його можна тримати тут. Секретний ключ (service_role) сюди НЕ вставляти.
-  // Поки поля порожні, сайт працює з assets/js/data.js, адмінка недоступна.
-  supabaseUrl: "",
-  supabaseAnonKey: "",
+  // Підставте ваші дані з проекту Supabase. Anon / publishable key — публічний, але він потрібний
+  // для клієнтського JS. service_role не вставляйте сюди.
+  supabaseUrl: "https://YOUR_PROJECT_ID.supabase.co",
+  supabaseAnonKey: "YOUR_SUPABASE_ANON_KEY",
 
   // true — показувати вибір «Оплатити онлайн» (потрібна розгорнута функція payment, див. README).
   onlinePayment: false,
