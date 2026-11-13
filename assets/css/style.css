@@ -233,3 +233,8 @@ h1, h2, h3, p { margin: 0; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .plate.is-active, .plate.is-leaving, .plate.is-wait { transform: none !important; }
 }
+
+/* Соцмережі, нотатки */
+.footer-social { display: flex; gap: 12px; flex-wrap: wrap; font-size: 14px; }
+.footer-social a { text-decoration: underline; }
+.seg-row span { text-align: center; padding: 6px 10px; line-height: 1.25; }

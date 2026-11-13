@@ -1,10 +1,100 @@
 <!doctype html>
-<html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#A93118"><title>Адмін-панель — Пельменчук</title><link rel="stylesheet" href="assets/css/admin.css"></head>
-<body><main class="admin-wrap"><header class="top"><div><h1>Адмін-панель</h1><p>Пельменчук · керування сайтом і замовленнями</p></div><a href="index.html">← На сайт</a></header>
-<section id="loginPanel" class="panel"><h2>Вхід адміністратора</h2><form id="loginForm"><label>Email<input name="email" type="email" required autocomplete="username"></label><label>Пароль<input name="password" type="password" required autocomplete="current-password"></label><button class="primary">Увійти</button><p id="loginMessage" class="message" role="alert"></p></form></section>
-<div id="dashboard" hidden><div class="toolbar"><p id="sessionLabel"></p><button id="refreshBtn">Оновити дані</button><button id="logoutBtn">Вийти</button></div>
-<nav class="tabs"><button data-tab="orders" class="active">Замовлення</button><button data-tab="products">Меню та ціни</button><button data-tab="settings">Тексти й посилання</button></nav>
-<section class="panel tab" id="ordersTab"><h2>Замовлення</h2><div class="table-wrap"><table><thead><tr><th>Дата / №</th><th>Клієнт</th><th>Склад</th><th>Сума</th><th>Статус</th></tr></thead><tbody id="ordersRows"></tbody></table></div><p id="ordersMessage" class="message"></p></section>
-<section class="panel tab" id="productsTab" hidden><div class="section-head"><div><h2>Меню та ціни</h2><p>Редагування застосовується до опублікованого сайту.</p></div><button id="importProducts">Завантажити початкове меню</button></div><div class="table-wrap"><table><thead><tr><th>Назва</th><th>Опис</th><th>Ціна</th><th>Вага</th><th>Посилання на фото</th><th>В наявності</th><th></th></tr></thead><tbody id="productsRows"></tbody></table></div><p id="productsMessage" class="message"></p></section>
-<section class="panel tab" id="settingsTab" hidden><h2>Тексти й посилання</h2><p>Збережіть зміни — вони з’являться на головній сторінці.</p><form id="settingsForm" class="settings-grid"></form><p id="settingsMessage" class="message"></p></section></div>
-</main><script src="assets/js/config.js"></script><script src="assets/js/data.js"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="assets/js/admin.js"></script></body></html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Адмінка — Пельменчук</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/img/favicon-32.png">
+<link rel="stylesheet" href="assets/css/admin.css">
+</head>
+<body>
+<header class="a-head">
+  <div class="a-wrap a-head-in">
+    <strong>Пельменчук · Адмінка</strong>
+    <nav id="tabs" class="a-tabs" hidden aria-label="Розділи">
+      <button type="button" data-tab="orders" aria-pressed="true">Замовлення <span id="newBadge" class="badge" hidden>0</span></button>
+      <button type="button" data-tab="menu" aria-pressed="false">Меню</button>
+      <button type="button" data-tab="settings" aria-pressed="false">Сайт</button>
+    </nav>
+    <span class="a-user" id="userBox" hidden><span id="userEmail"></span> <button type="button" class="a-btn a-ghost" id="logout">Вийти</button> <a class="a-btn a-ghost" href="index.html">На сайт</a></span>
+  </div>
+</header>
+
+<main class="a-wrap">
+  <p id="notice" class="notice" role="status" hidden></p>
+
+  <!-- Вхід -->
+  <section id="loginView" class="panel login" hidden>
+    <h1>Вхід</h1>
+    <form id="loginForm" novalidate>
+      <label>E-mail<input type="email" id="lEmail" autocomplete="username" required></label>
+      <label>Пароль<input type="password" id="lPass" autocomplete="current-password" required></label>
+      <p class="a-err" id="loginErr" role="alert"></p>
+      <button class="a-btn" type="submit">Увійти</button>
+    </form>
+  </section>
+
+  <section id="setupView" class="panel" hidden>
+    <h1>Адмінка ще не підключена</h1>
+    <p>У файлі <code>assets/js/config.js</code> вкажіть <code>supabaseUrl</code> та <code>supabaseAnonKey</code>. Покрокова інструкція в README.md.</p>
+  </section>
+
+  <!-- Замовлення -->
+  <section id="ordersView" hidden>
+    <div class="toolbar">
+      <label>Статус
+        <select id="orderFilter">
+          <option value="">Усі</option>
+          <option value="new">Нові</option>
+          <option value="confirmed">Підтверджені</option>
+          <option value="cooking">Готуються</option>
+          <option value="done">Виконані</option>
+          <option value="cancelled">Скасовані</option>
+        </select>
+      </label>
+      <button class="a-btn a-ghost" type="button" id="refreshOrders">Оновити</button>
+      <span class="muted" id="ordersInfo"></span>
+    </div>
+    <div id="ordersList" class="list"></div>
+  </section>
+
+  <!-- Меню -->
+  <section id="menuView" hidden>
+    <div class="panel">
+      <h2>Категорії</h2>
+      <div id="catList" class="cat-edit"></div>
+      <form id="catAdd" class="inline" novalidate>
+        <input id="catName" type="text" maxlength="40" placeholder="Нова категорія" aria-label="Назва нової категорії">
+        <button class="a-btn" type="submit">Додати категорію</button>
+      </form>
+    </div>
+    <div class="toolbar"><h2>Страви</h2><button class="a-btn" type="button" id="addProduct">+ Додати страву</button></div>
+    <div id="productList" class="list"></div>
+  </section>
+
+  <!-- Налаштування сайту -->
+  <section id="settingsView" hidden>
+    <form id="settingsForm" class="panel" novalidate>
+      <h2>Контакти, посилання, тексти</h2>
+      <label>Телефон (як показувати)<input name="phone" type="text" maxlength="40" placeholder="+380 50 123 45 67"></label>
+      <label>Телефон для дзвінка (без пробілів)<input name="phone_href" type="text" maxlength="20" placeholder="+380501234567"></label>
+      <label>Instagram: підпис<input name="instagram_label" type="text" maxlength="60" placeholder="@pelmenchuk"></label>
+      <label>Instagram: посилання<input name="instagram_url" type="url" placeholder="https://www.instagram.com/..."></label>
+      <label>Telegram: посилання<input name="telegram_url" type="url" placeholder="https://t.me/..."></label>
+      <label>Facebook: посилання<input name="facebook_url" type="url" placeholder="https://www.facebook.com/..."></label>
+      <label>Адреса<input name="address" type="text" maxlength="200"></label>
+      <label>Графік роботи<input name="hours" type="text" maxlength="120"></label>
+      <label>Про нас, абзац 1<textarea name="about1" rows="4" maxlength="1200"></textarea></label>
+      <label>Про нас, абзац 2<textarea name="about2" rows="4" maxlength="1200"></textarea></label>
+      <p class="a-err" id="settingsErr" role="alert"></p>
+      <button class="a-btn" type="submit">Зберегти</button>
+    </form>
+  </section>
+</main>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/admin.js"></script>
+</body>
+</html>

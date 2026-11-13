@@ -1,47 +1,76 @@
-# Пельменчук — сайт-вітрина (GitHub Pages)
+# Пельменчук: сайт з адмінкою, замовленнями та онлайн-оплатою
 
-Статичний сайт: HTML + CSS + JavaScript, без збірки та встановлення. Працює на GitHub Pages безкоштовно.
+Сайт (HTML/CSS/JS) лежить на GitHub Pages. Замовлення, меню, фото та вхід адміністратора працюють через **Supabase** (безкоштовний хмарний сервіс). Онлайн-оплата (Google Pay, Apple Pay, картка) йде через **WayForPay**.
 
-## Як опублікувати
+Без налаштування Supabase сайт працює в демо-режимі: меню береться з `assets/js/data.js`, замовлення нікуди не надходять, адмінка не відкривається.
 
-1. Створіть обліковий запис на github.com і натисніть **New repository**. Назва, наприклад, `pelmenchyk`. Тип — Public.
-2. У новому репозиторії натисніть **uploading an existing file** і перетягніть **весь вміст** цієї папки (не саму папку, а файли й папку `assets` всередині). Файл `.nojekyll` теж має потрапити (він прихований; якщо не завантажився, створіть порожній файл з такою назвою через **Add file → Create new file**).
-3. Натисніть **Commit changes**.
-4. Відкрийте **Settings → Pages**. У **Build and deployment** оберіть Source: **Deploy from a branch**, Branch: **main**, папка **/ (root)**, натисніть **Save**.
-5. Через 1–2 хвилини сайт буде за адресою `https://ВАШ_ЛОГІН.github.io/pelmenchyk/`.
+## 1. Завантажити сайт на GitHub (виправляє 404)
 
-## Що замінити після публікації
+У корені репозиторію мають лежати **файли поруч із папкою `assets`**: `index.html`, `admin.html`, `privacy.html`, `robots.txt`, `sitemap.xml`, `README.md`, а також папки `assets` і `supabase`. Папки `css`, `img`, `js` у корені (якщо є) видаліть.
 
-| Що | Де |
-|---|---|
-| `USERNAME` і `REPO` на ваш логін і назву репозиторію | `index.html` (canonical, og:url, og:image), `robots.txt`, `sitemap.xml` |
-| Тексти в квадратних дужках: історія, телефон, Instagram, адреса, графік | `index.html` |
-| Страви, ціни, ваги, описи | `assets/js/data.js` |
-| Фото страв | покладіть файл у `assets/img/` і вкажіть шлях у `data.js` у полі `image` |
-| Політика конфіденційності | `privacy.html` |
+Add file → Upload files → перетягніть усе з розпакованого архіву → Commit. Settings → Pages → Deploy from a branch → `main` / `(root)`.
 
-Страви без фото показують намальовані ілюстрації. Додайте фото в `data.js`, і вони замінять малюнок.
+Адреса сайту: `https://WestWolf1994.github.io/Pelmenchyk/`. Адмінка: `.../Pelmenchyk/admin.html`.
 
-## Важливо про замовлення
+## 2. Підключити Supabase (адмінка, замовлення, меню, фото)
 
-GitHub Pages — це лише хостинг файлів. **Власного сервера, бази даних і адмін-панелі тут немає.**
+1. Зареєструйтеся на supabase.com → **New project** (запам'ятайте пароль бази, регіон оберіть найближчий, напр. Frankfurt).
+2. **SQL Editor → New query**: вставте весь вміст `supabase/schema.sql` → **Run**. Створяться таблиці, права доступу, сховище фото та стартове меню.
+3. **Authentication → Users → Add user → Create new user**: ваш e-mail і надійний пароль (галочка Auto Confirm User). Відкрийте SQL Editor і виконайте, підставивши e-mail:
+   ```sql
+   insert into public.admins (user_id) select id from auth.users where email = 'ВАШ_EMAIL';
+   ```
+   Тільки той, кого додано в `admins`, потрапляє в адмінку.
+4. **Authentication → Sign In / Providers (Email)**: вимкніть **Allow new users to sign up**, щоб ніхто сторонній не міг зареєструватися.
+5. **Project Settings → API**: скопіюйте **Project URL** та ключ **anon / publishable**. Вставте в `assets/js/config.js`:
+   ```js
+   supabaseUrl: "https://xxxx.supabase.co",
+   supabaseAnonKey: "ваш_anon_ключ",
+   ```
+   Ключ `service_role` сюди **не вставляйте**. Anon-ключ публічний за задумом, безпеку забезпечують правила доступу з `schema.sql`.
+6. Збережіть `config.js` на GitHub. Через хвилину відкрийте `admin.html` і увійдіть.
 
-- Поки в `assets/js/config.js` поле `orderEndpoint` порожнє, сайт працює в **демо-режимі**: клієнт бачить номер замовлення, але ви його **не отримаєте**. Замовлення лишається тільки в браузері клієнта.
-- Щоб отримувати замовлення, вставте в `orderEndpoint` адресу сервісу, що приймає POST із JSON (Formspree, Google Apps Script, Make, Zapier або власний сервер). Сайт надсилає: `number, createdAt, name, phone, delivery, address, comment, items[], total`.
-- Захист від спаму: приховане поле-пастка, пауза між замовленнями (`orderCooldownMs`), блокування повторного натискання. Цього недостатньо для серйозного навантаження: вмикайте захист у самому сервісі (капча, ліміти).
-- Для повноцінної системи (база замовлень, адмін-панель, статуси) потрібен окремий сервер. Це інший проєкт, у цьому пакеті його немає.
+### Що вміє адмінка
+- **Замовлення**: список, ім'я, телефон, адреса, склад, сума, статус оплати; зміна статусу (нове → підтверджено → готується → виконано / скасовано); кнопка «Позначити оплаченим» для готівки; оновлюється кожні 20 с.
+- **Меню**: додавання, редагування, видалення страв; назва, опис, ціна, вага, категорія, наявність; фото (завантаження файлу або посилання); керування категоріями.
+- **Сайт**: телефон, Instagram/Telegram/Facebook, адреса, графік, тексти «Про нас».
 
-## Перевірка локально
+Ціни при замовленні перераховуються на сервері з бази, тож підмінити їх у браузері не вийде.
 
-Відкрийте `index.html` у браузері або запустіть `python3 -m http.server` у цій папці й перейдіть на http://localhost:8000.
+## 3. Онлайн-оплата (Google Pay, Apple Pay) через WayForPay
+
+Потрібен **акаунт WayForPay для вашого бізнесу (ФОП/ТОВ)** і підтверджений сайт. У кабінеті WayForPay увімкніть для вашого сайту Google Pay та Apple Pay (Apple Pay вимагає підтвердження домену в їхньому кабінеті).
+
+1. Встановіть [Supabase CLI](https://supabase.com/docs/guides/cli) і виконайте в папці проєкту:
+   ```
+   supabase login
+   supabase link --project-ref ВАШ_PROJECT_REF
+   supabase secrets set WFP_MERCHANT_ACCOUNT=ваш_merchant WFP_SECRET_KEY=ваш_секретний_ключ WFP_DOMAIN=westwolf1994.github.io SITE_URL=https://WestWolf1994.github.io/Pelmenchyk/
+   supabase functions deploy payment --no-verify-jwt
+   ```
+   `WFP_DOMAIN` має збігатися з доменом, який вказано в WayForPay.
+2. У `assets/js/config.js` поставте `onlinePayment: true` і збережіть.
+3. На сайті в оформленні з'явиться вибір «Онлайн (Google Pay, Apple Pay, картка)». Після оплати WayForPay повідомляє сервер, і замовлення в адмінці отримує статус «Оплачено».
+
+Номери карток ми не бачимо й не зберігаємо: оплата відбувається на сторінці WayForPay.
+
+Якщо ви використовуєте інший сервіс (Fondy, LiqPay, Stripe), потрібно переписати `supabase/functions/payment/index.ts` під його підпис.
+
+## Важливо
+
+- **Інтеграцію з Supabase та WayForPay я перевірив лише на імітації** (тестовий сервер з тими самими адресами запитів). На реальних сервісах вона не запускалась. Обов'язково зробіть тестове замовлення (готівка) і тестову оплату в режимі тестових карток WayForPay, перш ніж приймати справжні гроші.
+- Фото страв, які я додав (`assets/img`), лежать на GitHub. Фото, завантажені з адмінки, зберігаються в Supabase Storage.
+- Безкоштовний план Supabase призупиняє проєкт після тижня без активності. Зайдіть у кабінет і відновіть, якщо таке станеться.
+- Тексти `privacy.html` та умови оплати/повернення перегляньте з юристом.
+- Адресу `WestWolf1994/Pelmenchyk` уже вписано в `index.html`, `robots.txt`, `sitemap.xml`. Якщо змінете назву репозиторію, оновіть її там.
 
 ## Структура
 
 ```
-index.html          головна сторінка
-privacy.html        політика конфіденційності
-assets/css/         стилі
-assets/js/          config.js, data.js, illustrations.js, app.js
-assets/img/         фото, логотип, іконки
+index.html, admin.html, privacy.html
+assets/css/        style.css, admin.css
+assets/js/         config.js, api.js, data.js, illustrations.js, app.js, admin.js
+assets/img/        фото, логотип, іконки
+supabase/          schema.sql (база), functions/payment (оплата)
 robots.txt, sitemap.xml, .nojekyll
 ```

@@ -1,10 +1,28 @@
 /*
- * Supabase connection settings.
- * Replace these two values with Project URL and anon/publishable key from Supabase.
- * Never put the service_role key in this file or any browser code.
+ * Налаштування сайту. Змінюйте тут, не чіпаючи решту коду.
  */
 window.PELMENCHYK_CONFIG = {
-  supabaseUrl: "https://YOUR-PROJECT.supabase.co",
-  supabaseAnonKey: "YOUR_SUPABASE_ANON_KEY",
+  // Куди надсилати замовлення. GitHub Pages — статичний хостинг, власного сервера в нього немає.
+  // Вставте адресу сервісу, який приймає POST із JSON: Formspree, Google Apps Script,
+  // Make/Zapier, власний сервер. Приклад: "https://formspree.io/f/xxxxxxx"
+  // Поки адреса порожня, сайт працює в ДЕМО-режимі: замовлення лишається тільки в браузері клієнта.
+  orderEndpoint: "",
+
+  // Supabase: база замовлень, меню, адмінка. Дані беруться в Supabase → Project Settings → API.
+  // supabaseAnonKey — публічний ключ (anon / publishable), його можна тримати тут. Секретний ключ (service_role) сюди НЕ вставляти.
+  // Поки поля порожні, сайт працює з assets/js/data.js, адмінка недоступна.
+  supabaseUrl: "",
+  supabaseAnonKey: "",
+
+  // true — показувати вибір «Оплатити онлайн» (потрібна розгорнута функція payment, див. README).
+  onlinePayment: false,
+
+  // Мінімальна пауза між замовленнями з одного браузера (мілісекунди). Захист від повторного надсилання.
+  orderCooldownMs: 30000,
+
+  // Як довго чекати відповіді сервісу замовлень (мілісекунди).
+  requestTimeoutMs: 10000,
+
+  // Автоперемикання страв у головному блоці (мілісекунди).
   showcaseIntervalMs: 5200
 };

@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
 
+# Замініть USERNAME та REPO на свої
 Sitemap: https://WestWolf1994.github.io/Pelmenchyk/sitemap.xml

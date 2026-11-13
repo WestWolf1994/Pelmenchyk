@@ -25,10 +25,63 @@
   function safeGet(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } }
   function safeSet(k, v) { try { window.localStorage.setItem(k, v); } catch (e) { /* ігноруємо */ } }
 
+  var API = window.PM_API;
+  var useRemote = !!(API && API.enabled());
+
   var productById = {};
-  DATA.products.forEach(function (p) { productById[p.id] = p; });
   var categoryById = {};
-  DATA.categories.forEach(function (c) { categoryById[c.id] = c; });
+  function indexData() {
+    productById = {}; categoryById = {};
+    DATA.products.forEach(function (p) { productById[p.id] = p; });
+    DATA.categories.forEach(function (c) { categoryById[c.id] = c; });
+  }
+  indexData();
+
+  var BADGES = ["#F2C9A5", "#E9B8A8", "#F3DFA8", "#CBDCAA", "#E4CBA8", "#EBD7BB"];
+
+  // Меню з бази: страви перетворюємо у формат сайту. Показуємо тільки ті, що є в базі.
+  function applyRemote(r) {
+    if (!r || !r.categories || !r.products) return;
+    DATA.categories = r.categories.map(function (c) {
+      return { id: c.id, name: c.name, bg: c.bg || "#E4CBA8", image: c.image || "", art: c.art || "pelmeni", sauce: c.sauce || "#FFFDF8" };
+    });
+    DATA.products = r.products.map(function (p) {
+      return { id: Number(p.id), category: p.category, name: p.name, description: p.description || "", price: Number(p.price), weight: p.weight || "", image: p.image || "", art: p.art || "pelmeni", sauce: p.sauce || "#FFFDF8", available: !!p.available };
+    });
+    // Карусель: перші страви з фото
+    var withPhoto = DATA.products.filter(function (p) { return p.image && p.available; }).slice(0, 6);
+    DATA.showcase = withPhoto.map(function (p, i) {
+      var parts = p.name.split(" ");
+      return { product: p.id, line1: parts[0], line2: parts.slice(1).join(" ") || " ", short: parts[0], badge: BADGES[i % BADGES.length] };
+    });
+    indexData();
+    applySettings(r.settings || []);
+  }
+
+  // Контакти й тексти з налаштувань
+  function applySettings(rows) {
+    var S = {};
+    rows.forEach(function (r) { S[r.key] = r.value; });
+    $$("[data-s]").forEach(function (el) { var v = S[el.getAttribute("data-s")]; if (v) el.textContent = v; });
+    $$("[data-s-href]").forEach(function (el) {
+      var v = S[el.getAttribute("data-s-href")];
+      if (v) el.setAttribute("href", (el.getAttribute("data-s-prefix") || "") + v);
+    });
+    var soc = $("#footerSocial");
+    if (soc) {
+      var links = [["instagram_url", "Instagram"], ["telegram_url", "Telegram"], ["facebook_url", "Facebook"]];
+      soc.innerHTML = links.filter(function (l) { return /^https?:\/\//i.test(S[l[0]] || ""); })
+        .map(function (l) { return '<a href="' + esc(S[l[0]]) + '" target="_blank" rel="noopener">' + l[1] + '</a>'; }).join("");
+    }
+  }
+
+  function loadRemote() {
+    if (!useRemote) return Promise.resolve();
+    return Promise.race([
+      API.getPublic().then(applyRemote),
+      new Promise(function (res) { setTimeout(res, 4000); })
+    ]).catch(function () { /* залишаємо data.js */ });
+  }
 
   /* ---------- Зображення: фото або малюнок ---------- */
   function mediaHTML(item, alt) {
@@ -266,6 +319,8 @@
     btn.disabled = true;
     btn.textContent = "Надсилаємо…";
 
+    if (useRemote) { submitRemote(order); return; }
+
     var endpoint = (CFG.orderEndpoint || "").trim();
     if (!endpoint) {
       // ДЕМО-режим: сервера немає, зберігаємо лише в браузері клієнта.
@@ -293,7 +348,57 @@
     });
   }
 
-  function finish(order, demo) {
+  function failSubmit(msg) {
+    submitting = false;
+    var btn = $("#submitBtn");
+    btn.disabled = false;
+    btn.textContent = "Підтвердити замовлення";
+    $("#formError").textContent = msg;
+  }
+
+  function submitRemote(order) {
+    var online = onlineAllowed() && form.elements.payment.value === "online";
+    API.rpc("create_order", {
+      p_name: order.name, p_phone: order.phone, p_delivery: order.delivery, p_address: order.address,
+      p_comment: order.comment, p_items: cart.map(function (r) { return { id: r.id, qty: r.qty }; }),
+      p_payment: online ? "online" : "cash"
+    }).then(function (res) {
+      order.number = res.number;
+      order.total = res.total;
+      if (!online) { finish(order, false); return; }
+      return API.payment("create", { number: res.number }).then(function (pay) {
+        safeSet(LAST_ORDER_KEY, String(Date.now()));
+        cart = []; saveCart(); renderCart();
+        postToPayment(pay);
+      }, function () {
+        // Замовлення створене, але оплату відкрити не вдалося
+        finish(order, false, "Замовлення створено, але онлайн-оплата зараз недоступна. Ми зателефонуємо вам, щоб узгодити оплату.");
+      });
+    }).catch(function (err) {
+      var m = String(err && err.message || "");
+      if (/too many orders/.test(m)) failSubmit("Забагато замовлень з цього номера. Зачекайте кілька хвилин або зателефонуйте нам.");
+      else if (/unavailable item/.test(m)) failSubmit("Деяких страв уже немає в наявності. Оновіть сторінку й перевірте кошик.");
+      else failSubmit("Не вдалося надіслати замовлення. Перевірте інтернет і спробуйте ще раз або зателефонуйте нам.");
+    });
+  }
+
+  // Перехід на захищену сторінку оплати (форма POST)
+  function postToPayment(pay) {
+    var f = document.createElement("form");
+    f.method = "POST"; f.action = pay.url; f.style.display = "none";
+    Object.keys(pay.fields).forEach(function (k) {
+      [].concat(pay.fields[k]).forEach(function (v) {
+        var i = document.createElement("input");
+        i.type = "hidden"; i.name = k; i.value = v; f.appendChild(i);
+      });
+    });
+    document.body.appendChild(f);
+    f.submit();
+  }
+
+  function onlineAllowed() { return useRemote && !!CFG.onlinePayment; }
+
+  function finish(order, demo, text) {
     safeSet(LAST_ORDER_KEY, String(Date.now()));
     cart = [];
     saveCart();
@@ -304,6 +409,7 @@
     $("#submitBtn").disabled = false;
     $("#submitBtn").textContent = "Підтвердити замовлення";
     $("#orderNumber").textContent = order.number;
+    $("#doneText").textContent = text || "Ми зателефонуємо вам для підтвердження.";
     $("#demoNote").hidden = !(demo && !(CFG.orderEndpoint || "").trim());
     showView("done");
     $("#drawer").focus();
@@ -467,11 +573,39 @@
   window.addEventListener("storage", function (e) { if (e.key === CART_KEY) { loadCart(); renderCart(); } });
 
   /* ---------- Старт ---------- */
-  loadCart();
-  renderCategories();
-  renderFilters();
-  renderProducts();
-  renderCart();
-  buildShowcase();
-  initShowcaseControls();
+  // Повернення з оплати: ?order=PM-...
+  function checkReturn() {
+    var m = /[?&]order=([^&]+)/.exec(location.search);
+    if (!m || !useRemote) return;
+    var number = decodeURIComponent(m[1]);
+    API.rpc("order_status", { p_number: number }).then(function (r) {
+      if (!r) return;
+      openCart();
+      showView("done");
+      $("#orderNumber").textContent = r.number;
+      $("#doneText").textContent = r.payment_status === "paid"
+        ? "Оплату отримано. Дякуємо! Ми вже готуємо ваше замовлення."
+        : r.payment_status === "failed"
+          ? "Оплата не пройшла. Зателефонуйте нам, і ми допоможемо завершити замовлення."
+          : "Очікуємо підтвердження оплати від банку. Ми зателефонуємо вам, якщо потрібно.";
+      if (r.payment_status === "paid") { cart = []; saveCart(); renderCart(); }
+      if (window.history && history.replaceState) history.replaceState(null, "", location.pathname);
+    }).catch(function () { /* ігноруємо */ });
+  }
+
+  function start() {
+    loadCart();
+    // Прибираємо з кошика страви, яких немає
+    cart = cart.filter(function (r) { return productById[r.id] && productById[r.id].available; });
+    renderCategories();
+    renderFilters();
+    renderProducts();
+    renderCart();
+    $("#paymentField").hidden = !onlineAllowed();
+    buildShowcase();
+    initShowcaseControls();
+    checkReturn();
+  }
+
+  loadRemote().then(start, start);
 })();
