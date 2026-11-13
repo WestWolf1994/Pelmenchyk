@@ -1,5 +1,4 @@
 User-agent: *
 Allow: /
 
-# Замініть USERNAME та REPO на свої
-Sitemap: https://USERNAME.github.io/REPO/sitemap.xml
+Sitemap: https://WestWolf1994.github.io/Pelmenchyk/sitemap.xml
